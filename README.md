@@ -82,7 +82,7 @@ Then:
 ##  Usage
 
 - Recipients page: upload CSV (`email,name,subscription_status`)
-- Campaigns page: create draft campaigns, optionally schedule
+- Campaigns page: create campaigns, schedule it
 - Scheduler: moves drafts to scheduled, enqueues send tasks
 - Workers: send emails, monitor progress, finalize campaigns
 - Reports: CSV saved to `REPORTS_DIR` + emailed to `ADMIN_EMAIL`
