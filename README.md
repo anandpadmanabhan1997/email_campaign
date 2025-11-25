@@ -25,14 +25,14 @@ Key environment variables:
 
 ---
 
-## 🔄 Git Pull Workflow
-
-### 1. Navigate to your project directory
+##  Clone the repo
 
  - git clone https://github.com/anandpadmanabhan1997/email_campaign.git
  - cd email_campaign
  - git checkout main
 
+
+##  Setup --> Local vs Docker
 
 ##  Local Setup
 
