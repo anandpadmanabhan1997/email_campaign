@@ -22,25 +22,31 @@ async def upload_recipients(
     file: UploadFile = File(...),
     update_on_duplicate: bool = Form(False),
 ):
-    """
-    Upload a CSV file. If update_on_duplicate is true, existing recipients will be updated
-    according to merge rules (subscription_status overwritten only when provided, name set only if provided).
-    """
-    contents = await file.read()
     try:
-        text = contents.decode("utf-8")
-    except UnicodeDecodeError:
-        text = contents.decode("latin-1")
+        print("upload",flush=True)
 
-    def run():
-        return process_recipient_csv(StringIO(text), update_on_duplicate=update_on_duplicate)
+        contents = await file.read()
+        try:
+            text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            text = contents.decode("latin-1")
 
-    try:
-        result = await run_in_threadpool(run)
+        def run():
+            print("run",flush=True)
+            return process_recipient_csv(StringIO(text), update_on_duplicate=update_on_duplicate)
+
+        try:
+            result = await run_in_threadpool(run)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+        return result
+
     except Exception as exc:
+        print(exc.__class__.__name__, str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
-    return result
+
 
 
 @router.delete("/clear", summary="Delete all recipients (dangerous!)")

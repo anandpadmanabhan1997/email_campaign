@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Email / SMTP
     MAIL_TRANSPORT: str = Field("mailhog")
-    SMTP_HOST: str = Field("mailhog")
+    SMTP_HOST: str = Field("localhost")
     SMTP_PORT: int = Field(1025)
     SMTP_USER: str = Field("")
     SMTP_PASSWORD: str = Field("")

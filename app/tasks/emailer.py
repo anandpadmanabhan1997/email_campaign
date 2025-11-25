@@ -44,10 +44,11 @@ logger = get_task_logger(__name__)
 # Config
 RECIPIENT_CHUNK = int(os.environ.get("RECIPIENT_CHUNK", "200"))
 SMTP_HOST = os.environ.get("SMTP_HOST", "localhost")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "1025"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes")
+SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "false").lower() in ("1", "true", "yes")
+
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
 SEND_RETRY_COUNT = int(os.environ.get("SEND_RETRY_COUNT", "3"))
 SEND_RETRY_BACKOFF = int(os.environ.get("SEND_RETRY_BACKOFF", "2"))  # base seconds
@@ -74,37 +75,56 @@ def _send_smtp_message(msg):
         last_exc = None
         for attempt in range(1, SEND_RETRY_COUNT + 1):
             try:
+                print(
+                    f"Attempt {attempt}: Connecting to SMTP server {SMTP_HOST}:{SMTP_PORT} "
+                    f"(TLS={SMTP_USE_TLS})", flush=True
+                )
+
                 if SMTP_USE_TLS:
-                    # STARTTLS
                     with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
                         s.ehlo()
                         s.starttls()
                         s.ehlo()
                         if SMTP_USER:
+                            print(f"Logging in as {SMTP_USER}", flush=True)
                             s.login(SMTP_USER, SMTP_PASS)
                         s.send_message(msg)
                 else:
-                    # SSL
-                    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+                    # plain SMTP, no TLS (correct for MailHog on :1025)
+                    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
                         if SMTP_USER:
+                            print(f"Logging in as {SMTP_USER}", flush=True)
                             s.login(SMTP_USER, SMTP_PASS)
                         s.send_message(msg)
-                return None  # success
+
+                print(f"Attempt {attempt}: Message sent successfully!", flush=True)
+                return None
+
             except Exception as exc:
                 last_exc = exc
+                backoff = SEND_RETRY_BACKOFF ** attempt
+                print(
+                    f"Attempt {attempt} failed on {SMTP_HOST}:{SMTP_PORT} "
+                    f"with error: {exc} (backoff={backoff}s)",
+                    flush=True
+                )
                 logger.warning(
-                    "SMTP send attempt %s failed: %s (backoff=%ss)",
+                    "SMTP send attempt %s failed on %s:%s: %s (backoff=%ss)",
                     attempt,
+                    SMTP_HOST,
+                    SMTP_PORT,
                     exc,
-                    SEND_RETRY_BACKOFF ** attempt,
+                    backoff,
                 )
                 if attempt < SEND_RETRY_COUNT:
-                    time.sleep(SEND_RETRY_BACKOFF ** attempt)
+                    time.sleep(backoff)
+
+        print(f"All {SEND_RETRY_COUNT} attempts failed. Last error: {last_exc}", flush=True)
         return last_exc  # after exhausting retries
 
     except Exception as exc:
         logger.exception("Failed to send SMTP message: %s", exc)
-        print(f"Failed to send SMTP message: {exc}", flush=True)
+        print(f"Failed to send SMTP message on {SMTP_HOST}:{SMTP_PORT}: {exc}", flush=True)
         return exc
 
 def _make_email_message(subject: str, content: str, to_email: str, from_email: str | None = None):
@@ -215,32 +235,46 @@ def finalize_campaign(self, campaign_id: int) -> Dict[str, Any]:
     """
     db = SessionLocal()
     try:
+        logger.info("finalize_campaign START campaign_id=%s", campaign_id)
+        print(f"[finalize_campaign] START campaign_id={campaign_id}", flush=True)
+
         campaign = repositories.get_campaign(db, campaign_id)
         if not campaign:
+            print(f"[finalize_campaign] ERROR: campaign {campaign_id} not found", flush=True)
             raise ValueError("campaign not found")
 
         sent, failed = repositories.get_delivery_counts(db, campaign_id)
         total = int(campaign.total_recipients or 0)
+        logger.info("finalize_campaign counts: sent=%s failed=%s total=%s", sent, failed, total)
+        print(f"[finalize_campaign] Counts: sent={sent}, failed={failed}, total={total}", flush=True)
 
         # Terminal state decision
         try:
             if total == sent and failed == 0:
                 repositories.update_campaign_status(db, campaign, CampaignStatus.COMPLETED)
+                logger.info("finalize_campaign: campaign %s COMPLETED", campaign_id)
+                print(f"[finalize_campaign] Campaign {campaign_id} marked COMPLETED", flush=True)
             else:
-                # choose a policy: PARTIAL if you have it; otherwise COMPLETED with failures noted
                 if hasattr(CampaignStatus, "PARTIAL"):
                     repositories.update_campaign_status(db, campaign, CampaignStatus.PARTIAL)
+                    logger.info("finalize_campaign: campaign %s PARTIAL", campaign_id)
+                    print(f"[finalize_campaign] Campaign {campaign_id} marked PARTIAL", flush=True)
                 else:
                     repositories.update_campaign_status(db, campaign, CampaignStatus.COMPLETED)
-        except Exception:
-            # fallback string for robustness if Enum write fails
+                    logger.info("finalize_campaign: campaign %s COMPLETED (with failures)", campaign_id)
+                    print(f"[finalize_campaign] Campaign {campaign_id} marked COMPLETED (with failures)", flush=True)
+        except Exception as exc:
+            logger.warning("finalize_campaign fallback status for %s: %s", campaign_id, exc)
+            print(f"[finalize_campaign] Fallback status for campaign {campaign_id}: {exc}", flush=True)
             campaign.status = "completed"
             db.add(campaign)
             db.commit()
             db.refresh(campaign)
+            print(f"[finalize_campaign] Campaign {campaign_id} marked 'completed' (fallback)", flush=True)
 
         # Build CSV report in-memory
         rows = db.query(DeliveryLog).filter(DeliveryLog.campaign_id == campaign_id).all()
+        print(f"[finalize_campaign] Building CSV report for campaign {campaign_id}, rows={len(rows)}", flush=True)
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["recipient_id", "recipient_email", "status", "error"])
@@ -249,6 +283,7 @@ def finalize_campaign(self, campaign_id: int) -> Dict[str, Any]:
             writer.writerow([r.recipient_id, r.recipient_email, st, r.error or ""])
         csv_content = output.getvalue()
         output.close()
+        print(f"[finalize_campaign] CSV report built for campaign {campaign_id}", flush=True)
 
         # Email report to admin
         if ADMIN_EMAIL:
@@ -269,13 +304,20 @@ def finalize_campaign(self, campaign_id: int) -> Dict[str, Any]:
             )
             try:
                 _send_smtp_message(msg)
-            except Exception:
+                logger.info("finalize_campaign: admin report sent for campaign %s", campaign_id)
+                print(f"[finalize_campaign] Admin report sent for campaign {campaign_id}", flush=True)
+            except Exception as exc:
                 logger.exception("Failed sending admin report for campaign %s", campaign_id)
+                print(f"[finalize_campaign] ERROR sending admin report for campaign {campaign_id}: {exc}", flush=True)
 
-        return {"campaign_id": campaign_id, "sent": sent, "failed": failed}
+        result = {"campaign_id": campaign_id, "sent": sent, "failed": failed}
+        logger.info("finalize_campaign DONE campaign_id=%s result=%s", campaign_id, result)
+        print(f"[finalize_campaign] DONE campaign_id={campaign_id} result={result}", flush=True)
+        return result
 
     finally:
         db.close()
+        print(f"[finalize_campaign] DB session closed for campaign {campaign_id}", flush=True)
 
 
 @celery_app.task(bind=True, name="tasks.emailer.monitor_campaign")
@@ -289,40 +331,56 @@ def monitor_campaign(self, campaign_id: int, check_interval: int = 10, max_wait:
     db = SessionLocal()
     try:
         logger.info("monitor_campaign START campaign_id=%s check_interval=%s max_wait=%s",
-                campaign_id, check_interval, max_wait)
+                    campaign_id, check_interval, max_wait)
+        print(f"[monitor_campaign] START campaign_id={campaign_id} check_interval={check_interval} max_wait={max_wait}", flush=True)
+
         start = time.time()
-        logger.info("asdjbasdababbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        logger.info("monitor_campaign loop entered")
+        print("[monitor_campaign] Entered monitoring loop", flush=True)
+
         while True:
-            
             c = repositories.get_campaign(db, campaign_id)
-            print(c)
+            print(f"[monitor_campaign] Campaign object: {c}", flush=True)
+
             if not c:
+                print(f"[monitor_campaign] ERROR: campaign {campaign_id} not found", flush=True)
                 raise ValueError("campaign not found")
+
             total = int(c.total_recipients or 0)
             sent, failed = repositories.get_delivery_counts(db, campaign_id)
             processed = sent + failed
+
             logger.info("monitor_campaign %s: processed=%s total=%s", campaign_id, processed, total)
+            print(f"[monitor_campaign] campaign_id={campaign_id} processed={processed} total={total}", flush=True)
+
             if total == 0:
-                # no recipients, finalize immediately
+                print(f"[monitor_campaign] No recipients for campaign {campaign_id}, finalizing immediately", flush=True)
                 finalize_campaign.apply_async(args=[campaign_id])
                 return {"campaign_id": campaign_id, "status": "no_recipients"}
+
             if processed >= total:
-                # done
+                print(f"[monitor_campaign] All recipients processed for campaign {campaign_id}, finalizing", flush=True)
                 finalize_campaign.apply_async(args=[campaign_id])
                 return {"campaign_id": campaign_id, "status": "finalizing", "processed": processed}
+
             if time.time() - start > max_wait:
                 logger.warning("monitor_campaign %s reached max_wait; processed %s of %s", campaign_id, processed, total)
-                # decide: finalize anyway or requeue monitor; here we finalize to avoid indefinite waits
+                print(f"[monitor_campaign] TIMEOUT: campaign {campaign_id} processed={processed}/{total}, finalizing", flush=True)
                 finalize_campaign.apply_async(args=[campaign_id])
                 return {"campaign_id": campaign_id, "status": "timeout", "processed": processed}
-            # sleep before re-check
+
+            print(f"[monitor_campaign] Sleeping {check_interval}s before next check for campaign {campaign_id}", flush=True)
             time.sleep(check_interval)
-    except Exception:
+
+    except Exception as exc:
         logger.exception("monitor_campaign: unexpected error for campaign %s", campaign_id)
+        print(f"[monitor_campaign] EXCEPTION for campaign {campaign_id}: {exc}", flush=True)
         raise
-    
+
     finally:
         db.close()
+        print(f"[monitor_campaign] DB session closed for campaign {campaign_id}", flush=True)
+
 
 @celery_app.task(bind=True, name="tasks.emailer.send_campaign")
 def send_campaign(self, campaign_id: int) -> Dict[str, Any]:
@@ -381,8 +439,8 @@ def send_campaign(self, campaign_id: int) -> Dict[str, Any]:
 
         # Update total_recipients to what we actually queued
         try:
-            if hasattr(repositories, "update_campaign_total_recipients"):
-                repositories.update_campaign_total_recipients(db, campaign, total_tasks)
+            if hasattr(repositories, "set_campaign_total_recipients"):
+                repositories.set_campaign_total_recipients(db, campaign, total_tasks)
             else:
                 print("Failed to update total_recipients via repository, using direct assignment", flush=True)
                 campaign.total_recipients = total_tasks
@@ -421,4 +479,3 @@ def send_campaign(self, campaign_id: int) -> Dict[str, Any]:
     finally:
         db.close()
 
-   
