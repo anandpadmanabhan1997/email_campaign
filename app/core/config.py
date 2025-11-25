@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Reports
     REPORTS_DIR: str = Field("./data/reports")
-    ADMIN_EMAIL: str = Field("anandcelestis@gmail.com")
+    ADMIN_EMAIL: str = Field("anand@gmail.com")
 
     # Email / SMTP
     MAIL_TRANSPORT: str = Field("mailhog")
