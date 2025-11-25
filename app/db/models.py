@@ -19,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from .session import Base  # import Base from session (same package)
+from .session import Base  
 
 
 class SubscriptionStatus(str, enum.Enum):
@@ -45,7 +45,7 @@ class Recipient(Base):
     __tablename__ = "recipients"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(320), nullable=False, unique=True, index=True)  # normalized email unique
+    email = Column(String(320), nullable=False, unique=True, index=True)  
     name = Column(String(255), nullable=True)
     subscription_status = Column(String(32), nullable=False, default="subscribed")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -80,7 +80,7 @@ class Campaign(Base):
     total_recipients = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    queued_at = Column(DateTime(timezone=True))  # ← add this
+    queued_at = Column(DateTime(timezone=True))
 
     delivery_logs = relationship("DeliveryLog", back_populates="campaign", cascade="all, delete-orphan")
 
@@ -144,7 +144,6 @@ class DeliveryLog(Base):
         return f"<DeliveryLog id={self.id} campaign={self.campaign_id} to={self.recipient_email} status={self.status}>"
 
 
-# Index hints
 Index("ix_campaign_status_scheduled", Campaign.status, Campaign.scheduled_at)
 Index("ix_recipient_email_unique", Recipient.email)
 Index("ix_delivery_campaign_status", DeliveryLog.campaign_id, DeliveryLog.status)

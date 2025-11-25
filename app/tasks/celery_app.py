@@ -1,14 +1,17 @@
 import os
 from celery import Celery
+from app.core.config import get_settings
 
-BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6379/0")
-RESULT_BACKEND = os.environ.get("RESULT_BACKEND", BROKER_URL)
+settings = get_settings()
+
+BROKER_URL = settings.BROKER_URL
+RESULT_BACKEND = settings.RESULT_BACKEND
 
 celery_app = Celery(
     "email_tasks",
     broker=BROKER_URL,
     backend=RESULT_BACKEND,
-    include=["app.tasks.emailer", "app.tasks.schedulers"]  # match actual module paths
+    include=["app.tasks.emailer", "app.tasks.schedulers"]  
 )
 
 celery_app.conf.update(
@@ -26,8 +29,8 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
-    "enqueue-due-campaigns-every-10-seconds": {
-        "task": "app.tasks.schedulers.enqueue_due_campaigns",  # match the @task name
-        "schedule": 50.0   ,
+    "enqueue-due-campaigns-every-50-seconds": {
+        "task": "app.tasks.schedulers.enqueue_due_campaigns",  
+        "schedule": settings.CAMPAIGN_SCHEDULER_INTERVAL_SECONDS,   
          "options": {"queue": "control"} },
 }

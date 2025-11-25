@@ -11,7 +11,6 @@ import uvicorn
 from fastapi.staticfiles import StaticFiles
 from app import ui 
 
-# configure logging 
 LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -39,11 +38,10 @@ def _import_v1_routers():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan handler: ensure resources exist and initialize DB (no alembic).
+    Lifespan handler: ensure resources exist and initialize DB.
     """
     logger.info("LIFESPAN STARTUP: creating reports dir and initializing DB")
 
-    # Ensure reports dir exists
     try:
         reports_dir = settings.REPORTS_DIR
         logger.info("Ensuring reports directory exists at %s", reports_dir)
@@ -53,7 +51,6 @@ async def lifespan(app: FastAPI):
         logger.exception("Failed to create/verify reports dir %s: %s", settings.REPORTS_DIR, exc)
         raise
 
-    # Initialize DB tables as a fallback (SQLAlchemy create_all)
     try:
         from app.db import init_db
 
@@ -75,7 +72,6 @@ def create_app() -> FastAPI:
     logger.info("Creating FastAPI app instance")
     app = FastAPI(title="Bulk Mail", lifespan=lifespan)
 
-    # Import routers (will raise if any are missing)
     recipients_router, campaigns_router, reports_router = _import_v1_routers()
 
     app.include_router(recipients_router, prefix="/recipients", tags=["recipients"])
@@ -89,7 +85,6 @@ def create_app() -> FastAPI:
 
 # ASGI app
 app = create_app()
-
 
 if __name__ == "__main__":
     logging.getLogger("uvicorn.error").setLevel(logging.DEBUG)

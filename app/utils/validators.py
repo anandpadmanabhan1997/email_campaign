@@ -53,7 +53,6 @@ def validate_subscription_status(value: str | None) -> str:
     """
     raw = (value or "").strip().lower()
     if raw == "":
-        # treat empty as subscribed by convention; change to raise if you want to require an explicit value
         return "subscribed"
     if raw in _ALLOWED_STATUSES:
         return _ALLOWED_STATUSES[raw]

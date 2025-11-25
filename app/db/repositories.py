@@ -21,9 +21,7 @@ from .session import SessionLocal
 logger = logging.getLogger(__name__)
 
 
-# --------------------
-# Recipient utilities
-# --------------------
+
 def get_existing_recipient_emails(session, emails: Set[str]) -> Set[str]:
     """
     Return set of emails already present in DB from the provided set.
@@ -49,7 +47,6 @@ def bulk_insert_recipients(session, rows: List[Dict]) -> Tuple[int, int]:
     if not rows:
         return 0, 0
 
-    # Deduplicate incoming list by email (keep last)
     dedup_map: Dict[str, Dict] = {}
     for r in rows:
         dedup_map[r["email"]] = {
@@ -60,11 +57,9 @@ def bulk_insert_recipients(session, rows: List[Dict]) -> Tuple[int, int]:
 
     unique_emails = set(dedup_map.keys())
 
-    # Check existing emails in DB
     existing = get_existing_recipient_emails(session, unique_emails)
     duplicates_count = len(existing)
 
-    # Prepare list to insert (exclude existing)
     to_insert = [
         {"email": dedup_map[email]["email"], "name": dedup_map[email]["name"],
          "subscription_status": dedup_map[email]["subscription_status"]}
@@ -81,7 +76,6 @@ def bulk_insert_recipients(session, rows: List[Dict]) -> Tuple[int, int]:
     except IntegrityError as ie:
         logger.exception("IntegrityError during bulk insert: %s", ie)
         session.rollback()
-        # Fallback: per-row insert to maximize successful inserts and count duplicates
         inserted = 0
         for r in to_insert:
             try:
@@ -102,15 +96,12 @@ def bulk_insert_recipients(session, rows: List[Dict]) -> Tuple[int, int]:
         logger.exception("Unexpected error during bulk insert: %s", exc)
         raise
 
-    # Estimate inserted count as number of attempted inserts (len(to_insert)).
-    # If some were ignored due to race with other processes, they are effectively duplicates.
+
     inserted_count = len(to_insert)
     return inserted_count, duplicates_count
 
 
-# --------------------
-# Campaign utilities
-# --------------------
+
 def create_campaign(session, name: str, subject: str, content: str, scheduled_at=None) -> Campaign:
     """
     Create a new campaign and return the instance.
@@ -170,7 +161,6 @@ def list_campaigns_with_dashboard(session):
     from sqlalchemy import func, case
     from app.db.models import Campaign, DeliveryLog
 
-    # aggregate delivery counts per campaign in a single query
     q = (
         session.query(
             Campaign.id,

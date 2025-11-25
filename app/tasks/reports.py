@@ -56,7 +56,6 @@ def list_reports() -> List[Dict]:
     Return a list of generated report files with metadata.
     """
     items = _list_report_files()
-    # strip path for API surface
     for i in items:
         i.pop("path", None)
     return items
@@ -71,12 +70,10 @@ def download_report(filename: str):
     reports_dir = os.path.abspath(settings.REPORTS_DIR)
     requested = os.path.normpath(os.path.join(reports_dir, filename))
 
-    # security: prevent path traversal
     if not requested.startswith(reports_dir):
         raise HTTPException(status_code=400, detail="invalid filename")
 
     if not os.path.exists(requested) or not os.path.isfile(requested):
         raise HTTPException(status_code=404, detail="report not found")
 
-    # Return a FileResponse (streamed by Starlette)
     return FileResponse(path=requested, filename=os.path.basename(requested), media_type="text/csv")

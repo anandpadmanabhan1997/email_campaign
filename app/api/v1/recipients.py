@@ -64,7 +64,6 @@ def clear_recipients(confirm: bool = Query(False), db: Session = Depends(get_db)
             detail="Must provide ?confirm=true to clear all recipients",
         )
 
-    # Block if campaigns are scheduled or in progress
     blocking_campaigns = (
         db.query(Campaign)
         .filter(Campaign.status.in_(["scheduled", "in_progress"]))
@@ -73,17 +72,14 @@ def clear_recipients(confirm: bool = Query(False), db: Session = Depends(get_db)
     )
 
     if blocking_campaigns:
-        # Return helpful details for UI: count and a small sample list of id:name
         sample = [f"{c.id}:{c.name or 'untitled'}" for c in blocking_campaigns[:10]]
         detail_payload = {
             "message": "Cannot clear recipients while there are campaigns in scheduled/in_progress state",
             "count": len(blocking_campaigns),
             "campaigns": sample,
         }
-        # Use 409 Conflict to indicate blocked due to business rule
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail_payload)
 
-    # Perform deletion
     deleted = db.query(Recipient).delete(synchronize_session=False)
     db.commit()
     return {"deleted": deleted}

@@ -63,8 +63,6 @@ class CampaignCreate(BaseModel):
     name: str = Field(..., description="Campaign name (admin visible)")
     subject: str = Field(..., description="Email subject line")
     content: str = Field(..., description="Email content (plain text or HTML)")
-    # Accept timezone-aware ISO strings (with offset or Z) parsed into datetime by Pydantic,
-    # or naive datetimes which we'll treat as UTC on the server if needed.
     scheduled_at: Optional[datetime] = Field(None, description="Optional scheduled timestamp (ISO string or datetime)")
 
     model_config = {"extra": "forbid"}

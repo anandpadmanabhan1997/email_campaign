@@ -39,11 +39,15 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = Field(False)
 
     # Celery / Redis
-    CELERY_BROKER_URL: str = Field("redis://redis:6379/0")
-    CELERY_RESULT_BACKEND: str = Field("redis://redis:6379/1")
+    RESULT_BACKEND: str = Field("redis://127.0.0.1:6379/0")
+    BROKER_URL: str = Field("redis://127.0.0.1:6379/0")
+    CAMPAIGN_SCHEDULER_INTERVAL_SECONDS : int = Field(50)
+
 
     # Tuning
     BATCH_SIZE: int = Field(200)
+    SEND_RETRY_COUNT: int = Field(3)
+    SEND_RETRY_BACKOFF: int = Field(2)
     WORKER_CONCURRENCY: int = Field(4)
     RATE_LIMIT: str = Field("10/s")
 

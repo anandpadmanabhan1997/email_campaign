@@ -157,7 +157,7 @@ function bindUploadForm() {
   if (!form) return;
 
   if (sampleBtn) sampleBtn.addEventListener("click", () => {
-    const sample = "email,name,subscription_status\nalice@example.com,Alice,subscribed\nbob@example.com,Bob,unsubscribed\n";
+    const sample = "email,name,subscription_status\nalice@gmail.com,Alice,subscribed\nbob@aaaaaa.com,Bob,unsubscribed\n";
     const blob = new Blob([sample], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -347,7 +347,7 @@ function escapeHtml(s) {
   });
 }
 
-/* Campaigns UI helpers (added) */
+/* Campaigns UI helpers */
 
 /**
  * Convert ISO datetime string (UTC or offset) to a nicely formatted string in the user's timezone.
@@ -390,7 +390,6 @@ function formatIsoToLocal(iso) {
 /**
  * Load campaigns and render into #campaigns-table. Uses fetchJsonWithRetry for resilience.
  */
-// Replace or update your existing loadCampaigns() with this version
 async function loadCampaigns() {
   const tbody = document.querySelector("#campaigns-table tbody");
   if (!tbody) return;
@@ -410,14 +409,9 @@ async function loadCampaigns() {
       const failed = (c.failed_count != null) ? c.failed_count : 0;
       const summary = c.summary ?? `${sent}/${total || 0} sent`;
 
-      // Determine which action button(s) to show:
-      // - If Draft -> show Schedule button
-      // - If Scheduled -> show Unschedule button
-      // - If In Progress or Completed -> no scheduling action (you can add more if desired)
       let actionsHtml = "";
       const status = (c.status || "").toLowerCase();
       if (status === "draft") {
-        // Schedule: pass scheduled_at to be used as default; the UI will call server to schedule
         actionsHtml = `<button class="btn small schedule-btn" data-id="${c.id}" data-scheduled="${escapeHtml(c.scheduled_at || '')}">Schedule</button>`;
       } else if (status === "scheduled") {
         actionsHtml = `<button class="btn small danger unschedule-btn" data-id="${c.id}">Unschedule</button>`;
@@ -426,7 +420,7 @@ async function loadCampaigns() {
       }
 
       return `
-      <tr>
+      <tr class="campaign-row" data-id="${c.id ?? ""}">
         <td>${c.id ?? ""}</td>
         <td>${escapeHtml(c.name ?? "")}</td>
         <td>${escapeHtml(c.subject ?? "")}</td>
@@ -442,25 +436,20 @@ async function loadCampaigns() {
       `;
     }).join("");
 
-    // Attach handlers for buttons (delegation not required since we rewire after render)
     // Schedule buttons
     document.querySelectorAll(".schedule-btn").forEach(btn => {
       btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
         const id = btn.getAttribute("data-id");
-        const scheduled = btn.getAttribute("data-scheduled"); // may be empty
-        // Ask for confirmation and optionally let user enter/confirm scheduled time
-        // For simplicity: confirm scheduling using the campaign's stored scheduled_at if present,
-        // otherwise ask the user to confirm "Schedule campaign now?" and schedule immediately.
+        const scheduled = btn.getAttribute("data-scheduled");
         let confirmMsg = "Schedule campaign?";
         if (scheduled) {
-          // show local formatted scheduled time to user
           const local = formatIsoToLocal(scheduled);
           confirmMsg = `Schedule campaign for ${local}?`;
         } else {
           confirmMsg = "Schedule campaign to start now?";
         }
         if (!confirm(confirmMsg)) return;
-        // Call API to schedule (no override)
         await scheduleCampaign(id, null);
       });
     });
@@ -468,9 +457,19 @@ async function loadCampaigns() {
     // Unschedule buttons
     document.querySelectorAll(".unschedule-btn").forEach(btn => {
       btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
         const id = btn.getAttribute("data-id");
         if (!confirm("Unschedule this campaign and revert to Draft?")) return;
         await unscheduleCampaign(id);
+      });
+    });
+
+    // Row click -> load delivery details (ignore button clicks)
+    document.querySelectorAll("#campaigns-table tbody tr.campaign-row").forEach(row => {
+      row.addEventListener("click", (ev) => {
+        if (ev.target.closest("button")) return;
+        const id = row.getAttribute("data-id");
+        if (id) loadCampaignDetails(id);
       });
     });
 
@@ -481,8 +480,49 @@ async function loadCampaigns() {
 }
 
 /**
+ * Load delivery logs for a campaign into the detail table.
+ */
+async function loadCampaignDetails(campaignId) {
+  const card = document.getElementById("campaign-detail-card");
+  const title = document.getElementById("campaign-detail-title");
+  const tbody = document.querySelector("#campaign-detail-table tbody");
+  if (!card || !tbody) return;
+
+  card.style.display = "block";
+  tbody.innerHTML = `<tr><td colspan="5" class="muted">Loading deliveries…</td></tr>`;
+
+  try {
+    const logs = await fetchJsonWithRetry(`/campaigns/${encodeURIComponent(campaignId)}/deliveries`, {}, 1);
+    if (!logs || !logs.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">No delivery logs yet.</td></tr>`;
+      if (title) title.textContent = `Campaign ${campaignId} – no deliveries`;
+      return;
+    }
+
+    if (title) title.textContent = `Campaign ${campaignId} – deliveries`;
+
+    tbody.innerHTML = logs.map(l => {
+      const status = (l.status || "").toLowerCase();
+      const statusClass = status === "sent" ? "success-text" : (status === "failed" ? "error-text" : "");
+      const lastAttempt = l.last_attempt_at ? formatIsoToLocal(l.last_attempt_at) : "";
+      return `
+        <tr>
+          <td>${escapeHtml(l.recipient_email || "")}</td>
+          <td class="${statusClass}">${escapeHtml(l.status || "")}</td>
+          <td>${escapeHtml(l.error || "")}</td>
+          <td>${l.attempts ?? ""}</td>
+          <td>${escapeHtml(lastAttempt)}</td>
+        </tr>
+      `;
+    }).join("");
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Error loading deliveries: ${escapeHtml(err.message)}</td></tr>`;
+    if (typeof showToast === "function") showToast("Failed to load campaign deliveries: " + err.message, 5000);
+  }
+}
+
+/**
  * Helper: create an ISO string that preserves the local offset (e.g. "2025-01-01T00:00:00+05:30")
- * This preserves the user's entered local time and its offset so the server sees the original local value.
  */
 function toIsoWithOffset(localDate) {
   const pad = n => String(n).padStart(2, "0");
@@ -502,8 +542,6 @@ function toIsoWithOffset(localDate) {
 
 /**
  * Bind campaign creation form.
- * Reads manual date (YYYY-MM-DD) and numeric hour/minute.
- * Builds an ISO that preserves local offset and sends scheduled_at to server.
  */
 function bindCampaignForm() {
   const form = document.getElementById("campaign-form");
@@ -525,7 +563,6 @@ function bindCampaignForm() {
       return;
     }
 
-    // Build scheduled_iso if date provided; interpret date/time in browser local TZ and preserve offset
     let scheduled_iso = null;
     if (dateEl && dateEl.value) {
       const dateMatch = dateEl.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -539,13 +576,11 @@ function bindCampaignForm() {
       let hh = 0, mm = 0;
       if (hourEl && hourEl.value !== "") { hh = parseInt(hourEl.value, 10); if (Number.isNaN(hh)) hh = 0; }
       if (minuteEl && minuteEl.value !== "") { mm = parseInt(minuteEl.value, 10); if (Number.isNaN(mm)) mm = 0; }
-      // construct a local Date (browser local TZ)
       const local = new Date(y, mo, d, hh, mm, 0, 0);
       if (isNaN(local.getTime())) {
         if (typeof showToast === "function") showToast("Invalid date/time");
         return;
       }
-      // Preserve offset in the ISO we send so server receives "2025-01-01T00:00:00+05:30"
       scheduled_iso = toIsoWithOffset(local);
     }
 
@@ -556,7 +591,6 @@ function bindCampaignForm() {
     };
     if (scheduled_iso) payload.scheduled_at = scheduled_iso;
 
-    // UI feedback
     if (result) result.textContent = "";
 
     try {
@@ -575,7 +609,6 @@ function bindCampaignForm() {
         return;
       }
 
-      // success
       if (typeof showToast === "function") showToast("Campaign created (Draft)", 3000);
       form.reset();
       await loadCampaigns();
@@ -598,4 +631,20 @@ document.addEventListener("DOMContentLoaded", () => {
   if (refreshCampaigns) refreshCampaigns.addEventListener("click", () => loadCampaigns());
   const refreshRecipients = document.getElementById("refresh-recipients");
   if (refreshRecipients) refreshRecipients.addEventListener("click", () => loadRecipients());
+
+  const closeDetail = document.getElementById("close-campaign-detail");
+  if (closeDetail) {
+    closeDetail.addEventListener("click", () => {
+      const card = document.getElementById("campaign-detail-card");
+      const tbody = document.querySelector("#campaign-detail-table tbody");
+      if (card) card.style.display = "none";
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="muted">Select a campaign to view deliveries.</td></tr>`;
+    });
+  }
 });
+
+
+
+
+
+
