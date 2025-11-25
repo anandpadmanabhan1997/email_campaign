@@ -29,9 +29,9 @@ Key environment variables:
 
 ### 1. Navigate to your project directory
 
-  git clone https://github.com/anandpadmanabhan1997/email_campaign.git
-  cd email_campaign
-  git checkout main
+ - git clone https://github.com/anandpadmanabhan1997/email_campaign.git
+ - cd email_campaign
+ - git checkout main
 
 
 ##  Local Setup
