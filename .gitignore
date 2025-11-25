@@ -5,3 +5,4 @@
 logs/
 *.log       
 *.csv
+data/app.db
