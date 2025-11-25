@@ -37,26 +37,26 @@ Key environment variables:
 ##  Local Setup
 
 ### 1. Install dependencies
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+- python -m venv venv
+- source venv/bin/activate
+- pip install -r requirements.txt
 
 ### 2. Run services
 Redis:
-docker run -p 6379:6379 -d redis:7-alpine
+- docker run -p 6379:6379 -d redis:7-alpine
 
 MailHog:
-docker run -p 1025:1025 -p 8025:8025 -d mailhog/mailhog:v1.0.1
+- docker run -p 1025:1025 -p 8025:8025 -d mailhog/mailhog:v1.0.1
 
 ### 3. Start FastAPI
-uvicorn app.main:app --reload --port 8000
+- uvicorn app.main:app --reload --port 8000
 
 App: http://localhost:8000  
 Docs: http://localhost:8000/docs
 
 ### 4. Run Celery workers
-celery -A app.tasks.celery_app:celery_app worker -B -l info -Q control,send
-celery -A app.tasks.celery_app:celery_app worker -l info -Q celery,monitor
+- celery -A app.tasks.celery_app:celery_app worker -B -l info -Q control,send
+- celery -A app.tasks.celery_app:celery_app worker -l info -Q celery,monitor
 
 ---
 
@@ -71,7 +71,7 @@ This repo includes `docker-compose.yml` to run everything in containers:
 - mailhog: dev SMTP + web UI
 
 Start with:
-docker compose up --build
+- docker compose up --build
 
 Then:
 - App: http://localhost:8000
