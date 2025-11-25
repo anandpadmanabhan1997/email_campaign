@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Bulk Mail — Admin</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="/" aria-label="Bulk Mail Home">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M3 6l9 6 9-6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Bulk Mail</span>
+      </a>
+
+      <nav class="nav" role="navigation" aria-label="Primary">
+        <a href="/recipients" class="nav-link">Recipients</a>
+        <a href="/campaigns" class="nav-link">Campaigns</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite" role="status" hidden></div>
+
+  <footer class="footer container">
+    <small>© Bulk Mail — Minimal admin UI</small>
+  </footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
