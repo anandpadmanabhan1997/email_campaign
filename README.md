@@ -25,6 +25,15 @@ Key environment variables:
 
 ---
 
+## 🔄 Git Pull Workflow
+
+### 1. Navigate to your project directory
+
+  git clone https://github.com/anandpadmanabhan1997/email_campaign.git
+  cd email_campaign
+  git checkout main
+
+
 ##  Local Setup
 
 ### 1. Install dependencies
