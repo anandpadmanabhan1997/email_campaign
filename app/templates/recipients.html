@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page">
+  <div class="page-grid">
+    <div class="card">
+      <h2>Bulk upload recipients</h2>
+      <p class="muted">CSV columns: email, name (optional), subscription_status (optional)</p>
+
+      <form id="upload-form" class="form" action="/recipients/upload" method="post" enctype="multipart/form-data">
+        <label class="file-label">
+          <input id="csv-file" name="file" type="file" accept=".csv" required />
+          <span class="file-body">Choose CSV file</span>
+        </label>
+
+        <label class="checkbox" style="margin-top:10px;">
+          <input id="update-on-dup" name="update_on_duplicate" type="checkbox" value="1" />
+          <span style="margin-left:8px;">Update existing recipients if present</span>
+        </label>
+
+        <div class="form-row" style="margin-top:12px;">
+          <button id="upload-button" class="btn" type="submit">Upload</button>
+          <button id="sample-csv" type="button" class="btn secondary">Download sample</button>
+          <!-- Clear all button -->
+          <button id="clear-recipients" type="button" class="btn danger" title="Deletes all recipients (requires confirmation)">
+            Clear all recipients
+          </button>
+        </div>
+      </form>
+
+      <div id="upload-result" class="muted small" aria-live="polite"></div>
+
+      <!-- Detailed updated list -->
+      <div id="upload-updated" aria-live="polite" class="updated-list-wrap" hidden>
+        <strong class="updated-title">Updated emails</strong>
+        <ul id="upload-updated-list" class="updated-list"></ul>
+      </div>
+
+      <!-- Detailed errors & duplicates -->
+      <div id="upload-errors" aria-live="polite" class="error-list-wrap" hidden>
+        <strong class="error-title">Upload errors</strong>
+        <ul id="upload-errors-list" class="error-list"></ul>
+      </div>
+
+      <div id="upload-duplicates" aria-live="polite" class="error-list-wrap" hidden>
+        <strong class="error-title">Duplicate emails (skipped)</strong>
+        <ul id="upload-duplicates-list" class="error-list"></ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Recipients</h2>
+        <div class="card-actions">
+          <input id="filter-email" type="search" placeholder="Filter by email..." />
+          <button id="refresh-recipients" class="btn small">Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="recipients-table" class="table" aria-describedby="recipients-help">
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Email</th><th>Status</th><th>Created</th></tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="recipients-help" class="muted small">Showing first 500 rows. Use API pagination for more.</div>
+    </div>
+  </div>
+</section>
+{% endblock %}

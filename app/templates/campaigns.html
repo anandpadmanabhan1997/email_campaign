@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page">
+  <div class="page-grid">
+    <div class="card">
+      <h2>Create campaign</h2>
+      <form id="campaign-form" class="form" novalidate>
+        <label>
+          <span class="label-text">Name</span>
+          <input name="name" type="text" required />
+        </label>
+
+        <label>
+          <span class="label-text">Subject</span>
+          <input name="subject" type="text" required />
+        </label>
+
+        <label>
+          <span class="label-text">Content</span>
+          <textarea name="content" rows="8" required></textarea>
+        </label>
+
+        <fieldset style="border:0;padding:0;margin-top:8px;">
+          <legend style="font-weight:700;margin-bottom:6px;">Schedule (optional)</legend>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <label style="display:flex;flex-direction:column;">
+              <span class="label-text">Date (YYYY-MM-DD)</span>
+              <!-- plain text to enforce YYYY-MM-DD format consistently across locales -->
+              <input id="campaign-date" name="scheduled_date" type="text" placeholder="2025-12-01" pattern="^\d{4}-\d{2}-\d{2}$" />
+              <small class="muted small">Enter date in YYYY-MM-DD format</small>
+            </label>
+
+            <label style="display:flex;flex-direction:column;">
+              <span class="label-text">Hour (0–23)</span>
+              <input id="campaign-hour" name="scheduled_hour" type="number" min="0" max="23" placeholder="09" style="width:96px" />
+            </label>
+
+            <label style="display:flex;flex-direction:column;">
+              <span class="label-text">Minute (0–59)</span>
+              <input id="campaign-minute" name="scheduled_minute" type="number" min="0" max="59" placeholder="00" style="width:96px" />
+            </label>
+          </div>
+
+          <div class="muted small" style="margin-top:6px;">
+            Leave date blank to create as Draft. If you enter a date/time it will be saved but the campaign will remain a Draft until you explicitly schedule it.
+          </div>
+        </fieldset>
+
+        <div class="form-row" style="margin-top:12px;">
+          <button class="btn" type="submit">Create campaign</button>
+        </div>
+
+        <div id="campaign-result" class="muted small" aria-live="polite"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Existing campaigns</h2>
+        <div class="card-actions">
+          <button id="refresh-campaigns" class="btn small">Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="campaigns-table" class="table" aria-describedby="campaigns-help">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Scheduled</th>
+              <th>Created</th>
+              <th>Summary</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div id="campaigns-help" class="muted small">
+        Times are shown in your browser timezone. Campaigns created remain in Draft until explicitly scheduled.
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    // Lightweight client-side validation hint: if user mistypes date format show a quick message
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('campaign-form');
+      if (!form) return;
+      form.addEventListener('submit', (e) => {
+        const dateEl = document.getElementById('campaign-date');
+        if (dateEl && dateEl.value) {
+          const ok = /^\d{4}-\d{2}-\d{2}$/.test(dateEl.value.trim());
+          if (!ok) {
+            e.preventDefault();
+            const result = document.getElementById('campaign-result');
+            if (result) result.textContent = "Please use YYYY-MM-DD for the date.";
+            if (window.showToast) showToast("Invalid date format — use YYYY-MM-DD", 4000);
+            dateEl.focus();
+            return false;
+          }
+        }
+        // allow form to proceed; your app.js will intercept submit via JS and do the actual POST
+      });
+    });
+  </script>
+{% endblock %}

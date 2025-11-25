@@ -1,0 +1,82 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - mailhog
+
+  worker:
+    build: .
+    command: celery -A app.celery_app worker --loglevel=INFO -Q default
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    depends_on:
+      - redis
+      - web
+
+  beat:
+    build: .
+    command: celery -A app.celery_app beat --loglevel=INFO
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    depends_on:
+      - redis
+      - web
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  # MailHog (development SMTP capture)
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # HTTP UI
+
+  # Optional: Flower (Celery monitor) - uncomment to enable
+  # flower:
+  #   image: mher/flower
+  #   command: flower --broker=${CELERY_BROKER_URL}
+  #   ports:
+  #     - "5555:5555"
+  #   depends_on:
+  #     - redis
+
+  # Optional monitoring (Prometheus + Grafana) - uncomment if needed
+  # prometheus:
+  #   image: prom/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   depends_on:
+  #     - web
+  #     - worker
+  # grafana:
+  #   image: grafana/grafana
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - prometheus
+
+volumes:
+  redis-data:
