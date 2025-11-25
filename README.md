@@ -72,13 +72,22 @@ Then:
 
 ##  Usage
 
-- Recipients page: upload CSV (`email,name,subscription_status`)
-- Campaigns page: create draft campaigns, optionally schedule
-- Scheduler: moves drafts to scheduled, enqueues send tasks
-- Workers: send emails, monitor progress, finalize campaigns
-- Reports: CSV saved to `REPORTS_DIR` + emailed to `ADMIN_EMAIL`
+### Campaign Flow
+
+- **Recipients page**: upload CSV (`email,name,subscription_status`)
+- **Campaigns page**: create draft campaigns, optionally schedule
+- **Scheduler**: moves drafts to scheduled, enqueues send tasks
+- **Workers**: send emails, monitor progress, finalize campaigns
+- **Reports**: CSV saved to `REPORTS_DIR` + emailed to `ADMIN_EMAIL`
 
 ---
+
+### Testing with MailHog
+
+- Run MailHog and set `SMTP_HOST=localhost`, `SMTP_PORT=1025` in `.env`.
+- Create and schedule a campaign.
+- Open [http://localhost:8025] to view captured emails.
+
 
 ##  Notes
 - SQLite is fine for dev; use Postgres/MySQL for production.
